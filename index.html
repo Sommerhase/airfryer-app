@@ -11,7 +11,7 @@
         <div class="max-w-xl mx-auto flex justify-between items-center">
             <div>
                 <h1 class="text-xl font-bold">Airfryer Magazin & Rezepte</h1>
-                <p class="text-xs text-amber-100">Antippen zum Lesen & Sync</p>
+                <p class="text-xs text-amber-100">Mit Datei-Sync & Bildern</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="toggleModal('modal-neu')" class="bg-white text-amber-700 font-semibold px-3 py-1.5 rounded-lg shadow text-sm hover:bg-amber-50">+ Neu</button>
@@ -41,7 +41,7 @@
         <div id="recipeList" class="space-y-3"></div>
     </main>
 
-    <!-- MODAL: NEUES REZEPT / TURBO-IMPORT -->
+    <!-- MODAL: NEUES REZEPT -->
     <div id="modal-neu" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3">
@@ -49,8 +49,8 @@
                 <button onclick="toggleModal('modal-neu')" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
             </div>
             
-            <p class="text-xs text-gray-500 mb-2">Füge hier den Text ein (z.B. aus der KI-Ausgabe):</p>
-            <textarea id="turboInput" rows="6" placeholder="Titel, Zutaten, Zubereitung hier einfügen..." class="w-full p-3 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none mb-3"></textarea>
+            <p class="text-xs text-gray-500 mb-2">Füge hier den Text ein:</p>
+            <textarea id="turboInput" rows="6" placeholder="Titel, Zutaten, Zubereitung..." class="w-full p-3 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none mb-3"></textarea>
 
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Foto vom Gerät auswählen:</label>
@@ -84,7 +84,7 @@
         </div>
     </div>
 
-    <!-- MODAL: SYNC / EXPORT & IMPORT -->
+    <!-- MODAL: SYNC / DATEI EXPORT & IMPORT -->
     <div id="modal-sync" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3">
@@ -92,17 +92,17 @@
                 <button onclick="toggleModal('modal-sync')" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
             </div>
             
-            <p class="text-xs text-gray-600 mb-3">Kopiere alle Rezepte vom Handy und füge sie auf dem Tablet ein, um beide Geräte abzugleichen.</p>
+            <p class="text-xs text-gray-600 mb-3">Lade hier deine exportierte Rezept-Datei vom Handy hoch, um sie auf das Tablet zu übertragen.</p>
 
-            <div class="mb-4">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">1. Alle Rezepte exportieren (kopieren):</label>
-                <button onclick="exportData()" class="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-sm font-medium border">In Zwischenablage kopieren</button>
+            <div class="mb-4 bg-gray-50 p-3 rounded-xl border">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">1. Rezepte-Datei vom Handy exportieren:</label>
+                <button onclick="exportJSONFile()" class="w-full py-2 bg-white hover:bg-gray-100 text-gray-800 rounded-xl text-sm font-medium border shadow-sm">Backup-Datei herunterladen (.json)</button>
             </div>
 
-            <div class="mb-3">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">2. Rezepte auf anderem Gerät importieren (einfügen):</label>
-                <textarea id="importExportArea" rows="5" placeholder="Export-Code hier hineinfügen..." class="w-full p-2 border rounded-xl text-xs font-mono mb-2"></textarea>
-                <button onclick="importData()" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium shadow">Daten übernehmen & speichern</button>
+            <div class="mb-3 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+                <label class="block text-xs font-semibold text-amber-900 mb-1">2. Rezepte-Datei auf dem Tablet importieren:</label>
+                <input type="file" id="importFile" accept=".json" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 mb-2">
+                <button onclick="importJSONFile()" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium shadow">Datei einlesen & Rezepte speichern</button>
             </div>
 
             <div class="flex justify-end mt-4">
@@ -132,9 +132,6 @@
         function toggleModal(id) {
             const modal = document.getElementById(id);
             modal.classList.toggle('hidden');
-            if(id === 'modal-sync' && !modal.classList.contains('hidden')) {
-                prepareExport();
-            }
         }
 
         function setCategory(cat) {
@@ -247,41 +244,44 @@
 
         function filterRecipes() { renderRecipes(); }
 
-        function prepareExport() {
+        function exportJSONFile() {
             const transaction = db.transaction(['recipes'], 'readonly');
             const store = transaction.objectStore('recipes');
             store.getAll().onsuccess = (e) => {
-                document.getElementById('importExportArea').value = JSON.stringify(e.target.result);
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(e.target.result));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", "airfryer_rezepte_backup.json");
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
             };
         }
 
-        function exportData() {
-            const area = document.getElementById('importExportArea');
-            area.select();
-            navigator.clipboard.writeText(area.value).then(() => {
-                alert('Alle Rezepte inklusive Bildern in die Zwischenablage kopiert!');
-            });
-        }
+        function importJSONFile() {
+            const fileInput = document.getElementById('importFile');
+            if(!fileInput.files || !fileInput.files[0]) { alert('Bitte wähle zuerst eine Datei aus.'); return; }
 
-        function importData() {
-            const val = document.getElementById('importExportArea').value.trim();
-            if(!val) { alert('Keine Daten zum Importieren vorhanden.'); return; }
-            try {
-                const imported = JSON.parse(val);
-                const transaction = db.transaction(['recipes'], 'readwrite');
-                const store = transaction.objectStore('recipes');
-                imported.forEach(r => {
-                    delete r.id; 
-                    store.add(r);
-                });
-                transaction.oncomplete = () => {
-                    alert('Erfolgreich importiert!');
-                    toggleModal('modal-sync');
-                    loadRecipes();
-                };
-            } catch(e) {
-                alert('Ungültiges Datenformat!');
-            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    const transaction = db.transaction(['recipes'], 'readwrite');
+                    const store = transaction.objectStore('recipes');
+                    imported.forEach(r => {
+                        delete r.id; 
+                        store.add(r);
+                    });
+                    transaction.oncomplete = () => {
+                        alert('Erfolgreich importiert!');
+                        toggleModal('modal-sync');
+                        loadRecipes();
+                    };
+                } catch(err) {
+                    alert('Fehler beim Lesen der Datei!');
+                }
+            };
+            reader.readAsText(fileInput.files[0]);
         }
 
         function escapeHtml(text) {
